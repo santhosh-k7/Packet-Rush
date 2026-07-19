@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Packet Rush — Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060b13;
+    --grid-line: rgba(255,255,255,0.035);
+    --panel: #0e1a2c;
+    --panel-border: rgba(255,255,255,0.10);
+    --glass-bg: rgba(12,20,34,0.55);
+    --glass-border: rgba(255,255,255,0.16);
+    --cyan: #00e6ff;
+    --magenta: #ff2ec4;
+    --green: #34ffb0;
+    --red: #ff4d5e;
+    --gold: #ffcf4d;
+    --text: #eaf6ff;
+    --muted: #7fa3c4;
+    --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 34px 34px;
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  .screen {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    animation: fadeIn 0.35s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .hidden { display: none !important; }
+
+  #topBar {
+    position: fixed; top: 12px; right: 12px; z-index: 10;
+  }
+  .iconBtn {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text);
+  }
+  .iconBtn svg { width: 16px; height: 16px; }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin: 0 0 6px 0;
+  }
+  .subtitle { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; color: var(--muted); margin-bottom: 22px; }
+  #welcomeBack {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--green);
+    margin-bottom: 14px;
+    min-height: 16px;
+  }
+  input {
+    width: 100%; max-width: 320px;
+    padding: 16px;
+    font-family: var(--sans);
+    font-size: 17px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus { outline: none; border-color: var(--cyan); }
+  button {
+    padding: 18px 30px;
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 10px;
+    border: none;
+    background: var(--cyan);
+    color: #04111c;
+    width: 100%; max-width: 320px;
+    margin-bottom: 14px;
+  }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: transparent; border: 1px solid var(--cyan); color: var(--cyan); }
+  .hint { font-size: 13px; color: var(--muted); max-width: 320px; line-height: 1.6; }
+  #queueMsg { margin-top: 14px; font-family: var(--mono); font-size: 13px; color: var(--magenta); font-weight: 700; letter-spacing: 1px; }
+
+  #raceCard {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    width: 90%; max-width: 340px;
+    margin-bottom: 24px;
+  }
+  #timerDisplay { font-family: var(--mono); font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 16px; }
+  #steerTrack { position: relative; width: 100%; height: 12px; background: rgba(255,255,255,0.06); border: 1px solid var(--panel-border); border-radius: 8px; }
+  #steerDot { position: absolute; top: -8px; left: 50%; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 16px var(--cyan); transition: left 0.05s linear; }
+
+  #fallbackControls { display: flex; gap: 16px; width: 90%; max-width: 340px; }
+  #fallbackControls button { flex: 1; font-size: 26px; padding: 22px 0; margin-bottom: 0; background: var(--panel); border: 1px solid var(--panel-border); color: var(--cyan); }
+  #fallbackControls button:active { border-color: var(--cyan); }
+
+  #countdownBig {
+    font-family: var(--mono); font-size: 100px; font-weight: 700;
+    color: var(--cyan); text-shadow: 0 0 30px rgba(0,230,255,0.6);
+    margin-bottom: 10px;
+  }
+  #countdownBig.go { color: var(--green); font-size: 60px; letter-spacing: 4px; text-shadow: 0 0 30px rgba(52,255,176,0.7); }
+
+  #finishTitle { font-family: var(--mono); font-size: 26px; color: var(--magenta); letter-spacing: 2px; margin-bottom: 8px; }
+  #finishTime { font-family: var(--mono); font-size: 20px; margin-bottom: 6px; color: var(--text); }
+  #personalBestNote { font-family: var(--mono); font-size: 12px; color: var(--green); margin-bottom: 16px; min-height: 14px; }
+  #badgeRowC { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .badge {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    padding: 5px 10px; border-radius: 20px;
+    border: 1px solid var(--gold); color: var(--gold);
+    background: rgba(255,207,77,0.08);
+    opacity: 0; animation: badgeIn 0.4s ease forwards;
+  }
+  @keyframes badgeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+
+  @media (max-height: 480px) {
+    /* landscape phones */
+    h1 { font-size: 20px; margin-bottom: 2px; }
+    .subtitle { margin-bottom: 10px; }
+    #timerDisplay { font-size: 30px; margin-bottom: 8px; }
+    #raceCard { padding: 14px 20px; margin-bottom: 14px; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div id="topBar">
+    <button id="muteBtn" class="iconBtn" title="Mute / unmute"></button>
+  </div>
+
+  <div id="join" class="screen">
+    <h1>PACKET RUSH</h1>
+    <div class="subtitle">CONTROLLER LINK</div>
+    <div id="welcomeBack"></div>
+    <input id="nameInput" maxlength="16" placeholder="YOUR NAME" autocomplete="off" />
+    <button id="joinBtn">JOIN</button>
+    <div id="queueMsg"></div>
+  </div>
+
+  <div id="ready" class="screen hidden">
+    <h1>YOU'RE UP!</h1>
+    <button id="motionBtn" class="secondary hidden">ENABLE TILT CONTROL</button>
+    <button id="startBtn">START RACE</button>
+    <p class="hint">Tilt your phone left/right to steer (or use the ◀ ▶ buttons / arrow keys). Center = safe lane. Edges = fast lane — faster, but watch for hazards.</p>
+  </div>
+
+  <div id="countdownScreen" class="screen hidden">
+    <div id="countdownBig">3</div>
+    <p class="hint">Get ready to tilt...</p>
+  </div>
+
+  <div id="racing" class="screen hidden">
+    <div id="raceCard">
+      <div id="timerDisplay">T+00.00s</div>
+      <div id="steerTrack"><div id="steerDot"></div></div>
+    </div>
+    <div id="fallbackControls">
+      <button id="leftBtn">◀</button>
+      <button id="rightBtn">▶</button>
+    </div>
+    <p class="hint">Hold a button (or tilt, or ← → keys) to steer.</p>
+  </div>
+
+  <div id="finished" class="screen hidden">
+    <div id="finishTitle"></div>
+    <div id="finishTime"></div>
+    <div id="personalBestNote"></div>
+    <div id="badgeRowC"></div>
+    <button id="againBtn">RACE AGAIN</button>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // ============================================================
+  // Synthesized audio engine (mirrors display.html) — offline-safe,
+  // no external sound files.
+  // ============================================================
+  const AudioEngine = (() => {
+    let ctx;
+    let muted = localStorage.getItem("pr_muted") === "1";
+    function ensureCtx() {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+    function beep({ freq = 440, duration = 0.12, type = "sine", gain = 0.18, sweep = null } = {}) {
+      if (muted) return;
+      const c = ensureCtx();
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, c.currentTime);
+      if (sweep) osc.frequency.exponentialRampToValueAtTime(sweep, c.currentTime + duration);
+      g.gain.setValueAtTime(gain, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+      osc.connect(g).connect(c.destination);
+      osc.start();
+      osc.stop(c.currentTime + duration);
+    }
+    function click() { beep({ freq: 620, duration: 0.05, type: "square", gain: 0.1 }); }
+    function tick() { beep({ freq: 440, duration: 0.09, type: "sine", gain: 0.14 }); }
+    function go() { beep({ freq: 880, duration: 0.28, type: "sawtooth", gain: 0.16, sweep: 1400 }); }
+    function hazard() { beep({ freq: 180, duration: 0.18, type: "square", gain: 0.18, sweep: 60 }); }
+    function finishJingle() {
+      [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep({ freq: f, duration: 0.18, type: "triangle", gain: 0.16 }), i * 90));
+    }
+    function recordJingle() {
+      [659, 784, 988, 1318, 988, 1318].forEach((f, i) => setTimeout(() => beep({ freq: f, duration: 0.2, type: "triangle", gain: 0.18 }), i * 90));
+    }
+    function setMuted(v) { muted = v; localStorage.setItem("pr_muted", v ? "1" : "0"); }
+    function isMuted() { return muted; }
+    return { click, tick, go, hazard, finishJingle, recordJingle, setMuted, isMuted, ensureCtx };
+  })();
+
+  const socket = io();
+  const $ = (id) => document.getElementById(id);
+
+  let steerValue = 0;
+  let raceActive = false;
+  const keysDown = { left: false, right: false };
+
+  // ---------------- Mute ----------------
+  const muteIcons = {
+    on: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M19 5a10 10 0 0 1 0 14M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+    off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>'
+  };
+  function refreshMuteBtn() { $("muteBtn").innerHTML = AudioEngine.isMuted() ? muteIcons.off : muteIcons.on; }
+  $("muteBtn").onclick = () => { AudioEngine.setMuted(!AudioEngine.isMuted()); refreshMuteBtn(); };
+  refreshMuteBtn();
+
+  // ---------------- Local profile (per-device, no accounts needed) ------
+  const savedName = localStorage.getItem("pr_playerName");
+  const savedBest = parseFloat(localStorage.getItem("pr_personalBest") || "");
+  if (savedName) {
+    $("nameInput").value = savedName;
+    if (!isNaN(savedBest)) {
+      $("welcomeBack").textContent = "WELCOME BACK, " + savedName.toUpperCase() + " · YOUR BEST: " + (savedBest / 1000).toFixed(2) + "s";
+    }
+  }
+
+  function showScreen(id) {
+    ["join", "ready", "countdownScreen", "racing", "finished"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+  }
+
+  // --- Join flow -------------------------------------------------------
+  $("joinBtn").onclick = () => {
+    AudioEngine.ensureCtx();
+    AudioEngine.click();
+    const name = $("nameInput").value.trim() || "Player";
+    localStorage.setItem("pr_playerName", name);
+    socket.emit("controller:join", { name });
+  };
+
+  socket.on("controller:joined", () => {
+    $("queueMsg").textContent = "";
+    showScreen("ready");
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      $("motionBtn").classList.remove("hidden");
+    } else {
+      setupMotion();
+    }
+  });
+
+  socket.on("controller:queued", ({ position }) => {
+    $("queueMsg").textContent = "IN QUEUE · POSITION " + position;
+  });
+
+  // --- Motion setup ------------------------------------------------------
+  $("motionBtn").onclick = async () => {
+    try {
+      const result = await DeviceOrientationEvent.requestPermission();
+      if (result === "granted") { setupMotion(); $("motionBtn").classList.add("hidden"); }
+    } catch (e) { console.error("Motion permission error:", e); }
+  };
+  function setupMotion() {
+    window.addEventListener("deviceorientation", (e) => {
+      if (e.gamma === null || e.gamma === undefined) return;
+      let v = e.gamma / 35;
+      steerValue = Math.max(-1, Math.min(1, v));
+    });
+  }
+
+  // --- Touch fallback -----------------------------------------------
+  function bindHold(btn, dir) {
+    const start = (ev) => { if (ev) ev.preventDefault(); steerValue = dir; };
+    const end = (ev) => { if (ev) ev.preventDefault(); steerValue = 0; };
+    btn.addEventListener("touchstart", start, { passive: false });
+    btn.addEventListener("touchend", end, { passive: false });
+    btn.addEventListener("touchcancel", end, { passive: false });
+    btn.addEventListener("mousedown", start);
+    btn.addEventListener("mouseup", end);
+    btn.addEventListener("mouseleave", end);
+  }
+  bindHold($("leftBtn"), -1);
+  bindHold($("rightBtn"), 1);
+
+  // --- Keyboard fallback (handy for desk-testing without a phone) ------
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { keysDown.left = true; }
+    if (e.key === "ArrowRight") { keysDown.right = true; }
+    if (e.key === "Enter" && !$("ready").classList.contains("hidden")) $("startBtn").click();
+    updateKeySteer();
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "ArrowLeft") keysDown.left = false;
+    if (e.key === "ArrowRight") keysDown.right = false;
+    updateKeySteer();
+  });
+  function updateKeySteer() {
+    if (keysDown.left && !keysDown.right) steerValue = -1;
+    else if (keysDown.right && !keysDown.left) steerValue = 1;
+    else if (!keysDown.left && !keysDown.right) steerValue = 0;
+  }
+
+  // --- Race flow -----------------------------------------------------
+  $("startBtn").onclick = () => {
+    AudioEngine.click();
+    socket.emit("controller:start");
+  };
+
+  socket.on("race:countdown", ({ seconds }) => {
+    showScreen("countdownScreen");
+    const el = $("countdownBig");
+    if (seconds > 0) { el.textContent = seconds; el.className = ""; AudioEngine.tick(); }
+    else { el.textContent = "GO!"; el.className = "go"; AudioEngine.go(); }
+  });
+
+  socket.on("race:start", () => {
+    showScreen("racing");
+    raceActive = true;
+  });
+
+  socket.on("race:tick", (s) => {
+    $("timerDisplay").textContent = "T+" + (s.elapsed / 1000).toFixed(2) + "s";
+  });
+
+  socket.on("controller:hazardHit", () => {
+    AudioEngine.hazard();
+    if (navigator.vibrate) navigator.vibrate(150);
+  });
+
+  socket.on("race:finished", (s) => {
+    raceActive = false;
+    $("finishTitle").textContent = s.isNewRecord ? "★ NEW RECORD ★" : "LAP COMPLETE";
+    $("finishTime").textContent = (s.finalTime / 1000).toFixed(2) + "s";
+
+    // Personal best is tracked per-device locally, separate from the
+    // booth-wide all-time record.
+    const prevBest = parseFloat(localStorage.getItem("pr_personalBest") || "Infinity");
+    let newPersonalBest = false;
+    if (s.finalTime < prevBest) {
+      localStorage.setItem("pr_personalBest", s.finalTime);
+      newPersonalBest = true;
+    }
+    $("personalBestNote").textContent = newPersonalBest ? "NEW PERSONAL BEST" : "";
+
+    const badges = (s.achievements || []).slice();
+    if (newPersonalBest && !s.isNewRecord) badges.push({ id: "pb", label: "PERSONAL BEST" });
+    const row = $("badgeRowC");
+    row.innerHTML = "";
+    badges.forEach((a, i) => {
+      const chip = document.createElement("div");
+      chip.className = "badge";
+      chip.style.animationDelay = i * 0.12 + "s";
+      chip.textContent = a.label;
+      row.appendChild(chip);
+    });
+
+    showScreen("finished");
+    if (s.isNewRecord) AudioEngine.recordJingle(); else AudioEngine.finishJingle();
+  });
+
+  $("againBtn").onclick = () => { AudioEngine.click(); showScreen("ready"); };
+
+  // Send steering to the server at 20Hz and animate the local indicator
+  setInterval(() => {
+    if (raceActive) socket.emit("controller:steer", steerValue);
+    $("steerDot").style.left = 50 + steerValue * 45 + "%";
+  }, 50);
+
+  window.addEventListener("beforeunload", () => socket.emit("controller:leave"));
+</script>
+</body>
+</html>

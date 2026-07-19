@@ -1,0 +1,14 @@
+{
+  "name": "packet-rush",
+  "version": "1.0.0",
+  "description": "Expo booth game: scan a QR code, your phone becomes a tilt controller, race a data packet through a network and try to beat the live all-time ghost record.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5"
+  }
+}
